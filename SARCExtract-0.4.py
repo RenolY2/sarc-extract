@@ -124,6 +124,8 @@ class SARC(object):
         print("Reading SARC....")
         pos = 6
 
+        name, ext = os.path.splitext(sys.argv[1])
+
         if mode == 1: #Don"t need to check again with normal SARC
             magic1 = data[0:4]
 
@@ -137,7 +139,7 @@ class SARC(object):
 
                 print("Done!")
 
-        name, ext = os.path.splitext(sys.argv[1])
+
         order = uint16(data, pos);pos += 6 #Byte Order Mark
 
         if order != 65279: #0xFEFF - Big Endian
