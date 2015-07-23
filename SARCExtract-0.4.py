@@ -1,27 +1,43 @@
 '''Made by NWPlayer123, no rights reserved, feel free to do whatever'''
-import os, sys, struct
+
+import os
+import sys
+import struct
+
+try:
+    xrange(10)
+except NameError:
+    def xrange(*args):
+        return range(*args)
 
 def hexstr(data, length): #Convert input into hex string
     return hex(data).lstrip("0x").rstrip("L").zfill(length).upper()
+
 def binr(byte):
     return bin(byte).lstrip("0b").zfill(8)
+
 def uint8(data, pos):
     return struct.unpack(">B", data[pos:pos + 1])[0]
+
 def uint16(data, pos):
     return struct.unpack(">H", data[pos:pos + 2])[0]
+
 def uint24(data, pos):
     return struct.unpack(">I", "\00" + data[pos:pos + 3])[0] #HAX
+
 def uint32(data, pos):
     return struct.unpack(">I", data[pos:pos + 4])[0]
 
 def check(length, size, percent, count):
     length = float(length);size = float(size)
     test = round(length / size, 2) #Percent complete as decimal
-    test = test * 100 #Percent
+    test *= 100 #Percent
+
     if test % count == 0:
         if percent != test: #New Number
             print(str(test)[:-2] + "%")
             percent = test
+
     return percent
 
 def calchash(name, multiplier):
