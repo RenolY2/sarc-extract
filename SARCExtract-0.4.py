@@ -7,6 +7,8 @@ import struct
 try:
     xrange(10)
 except NameError:
+    # In Python 3, xrange does not exist anymore.
+    # Python 2's xrange is the same as Python 3's range, so we define it as such.
     def xrange(*args):
         return range(*args)
 
