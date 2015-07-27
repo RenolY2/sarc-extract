@@ -12,41 +12,50 @@ except NameError:
     def xrange(*args):
         return range(*args)
 
-def hexstr(data, length): #Convert input into hex string
+
+def hexstr(data, length):  # Convert input into hex string
     return hex(data).lstrip("0x").rstrip("L").zfill(length).upper()
+
 
 def binr(byte):
     return bin(byte).lstrip("0b").zfill(8)
 
+
 def uint8(data, pos):
     return struct.unpack(">B", data[pos:pos + 1])[0]
+
 
 def uint16(data, pos):
     return struct.unpack(">H", data[pos:pos + 2])[0]
 
+
 def uint24(data, pos):
-    return struct.unpack(">I", "\00" + data[pos:pos + 3])[0] #HAX
+    return struct.unpack(">I", "\00" + data[pos:pos + 3])[0]  # HAX
+
 
 def uint32(data, pos):
     return struct.unpack(">I", data[pos:pos + 4])[0]
 
+
 def check(length, size, percent, count):
     length = float(length);size = float(size)
-    test = round(length / size, 2) #Percent complete as decimal
+    test = round(length / size, 2)  # Percent complete as decimal
     test *= 100 #Percent
 
     if test % count == 0:
-        if percent != test: #New Number
+        if percent != test:  # New Number
             print(str(test)[:-2] + "%")
             percent = test
 
     return percent
+
 
 def calchash(name, multiplier):
     result = 0
     for x in xrange(len(name)):
         result = ord(name[x]) + result * multiplier
     return result
+
 
 def getstr(data):
     x = data.find("\x00")
@@ -55,7 +64,8 @@ def getstr(data):
     else:
         return data
 
-def intify(out, data, length = 0):
+
+def intify(out, data, length=0):
     if type(data) == str:
         for x in xrange(len(data)):
             out.append(ord(data[x]))
@@ -65,15 +75,16 @@ def intify(out, data, length = 0):
             out.append(int(data[x * 2:(x * 2) + 2], 16))
     return out
 
+
 class Yaz0(object):
     def decompress(self, data):
-        '''Thanks to thakis for yaz0dec, which I modeled this on after
-        I cleaned it up in v0.2, what with bit-manipulation and looping
-        Thanks to Kinnay for suggestions to make this even faster'''
+        # Thanks to thakis for yaz0dec, which I modeled this on after
+        # I cleaned it up in v0.2, what with bit-manipulation and looping
+        # Thanks to Kinnay for suggestions to make this even faster
         print("Decompressing Yaz0....")
 
         pos = 16
-        size = uint32(data, 4) #Uncompressed filesize
+        size = uint32(data, 4)  # Uncompressed filesize
         out = []
         dstpos = 0
 
@@ -81,11 +92,11 @@ class Yaz0(object):
         bits = 0
 
         if len(data) >= 5242880:
-            count = 5 #5MB is gonna take a while
+            count = 5  # 5MB is gonna take a while
         else:
             count = 10
 
-        while len(out) < size: #Read Entire File
+        while len(out) < size:  # Read Entire File
             percent = check(len(out), size, percent, count)
 
             if bits == 0:
@@ -93,7 +104,7 @@ class Yaz0(object):
                 pos += 1
                 bits = 8
 
-            if (code & 0x80) != 0: #Copy 1 Byte
+            if (code & 0x80) != 0:  # Copy 1 Byte
                 out.append(data[pos])
                 pos += 1
 
@@ -118,8 +129,9 @@ class Yaz0(object):
 
         out = "".join(out)
 
-        SARChive = SARC()
-        SARChive.extract(out, 1)
+        sarc_archive = SARC()
+        sarc_archive.extract(out, 1)
+
 
 class SARC(object):
     def extract(self, data, mode):
@@ -128,7 +140,7 @@ class SARC(object):
 
         name, ext = os.path.splitext(sys.argv[1])
 
-        if mode == 1: #Don"t need to check again with normal SARC
+        if mode == 1:  # Don"t need to check again with normal SARC
             magic1 = data[0:4]
 
             if magic1 != "SARC":
@@ -141,33 +153,44 @@ class SARC(object):
 
                 print("Done!")
 
+        # Byte Order Mark
+        order = uint16(data, pos)
+        pos += 6
 
-        order = uint16(data, pos);pos += 6 #Byte Order Mark
-
-        if order != 65279: #0xFEFF - Big Endian
+        if order != 65279:  # 0xFEFF - Big Endian
             print("Little endian not supported!")
             sys.exit(1)
 
+        # Start of data section
         doff = uint32(data, pos)
-        pos += 8 #Start of data section
+        pos += 8
 
         #---------------------------------------------------------------
-        magic2 = data[pos:pos + 4];pos += 6
+
+        magic2 = data[pos:pos + 4]
+        pos += 6
+
         assert magic2 == "SFAT"
 
-        nodec = uint16(data, pos);pos += 6 #Node Count
+        # Node Count
+        nodec = uint16(data, pos)
+        pos += 6
+
         nodes = []
         percent = 0
 
-
         print("Reading File Attribute Table...")
+
         for x in xrange(nodec):
             pos += 8
-            srt  = uint32(data, pos)
-            pos += 4 #File Offset Start
 
-            end  = uint32(data, pos)
-            pos += 4 #File Offset End
+            # File Offset Start
+            srt = uint32(data, pos)
+            pos += 4
+
+            # File Offset End
+            end = uint32(data, pos)
+            pos += 4
 
             nodes.append([srt, end])
 
@@ -194,7 +217,7 @@ class SARC(object):
                 string = getstr(data[pos:]);pos += len(string)
 
                 while ord(data[pos]) == 0:
-                    pos += 1 #Move to the next string
+                    pos += 1  # Move to the next string
 
                 strings.append(string)
 
@@ -257,12 +280,12 @@ def main():
     magic = data[0:4]
 
     if magic == "Yaz0":
-        SARChive = Yaz0()
-        SARChive.decompress(data)
+        sarc_archive = Yaz0()
+        sarc_archive.decompress(data)
 
     elif magic == "SARC":
-        SARChive = SARC()
-        SARChive.extract(data, 0)
+        sarc_archive = SARC()
+        sarc_archive.extract(data, 0)
 
     else:
         print("Unknown File Format: First 4 bytes of file must be Yaz0 or SARC")
