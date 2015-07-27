@@ -75,196 +75,194 @@ def intify(out, data, length=0):
             out.append(int(data[x * 2:(x * 2) + 2], 16))
     return out
 
+def yaz0_decompress(self, data):
+    # Thanks to thakis for yaz0dec, which I modeled this on after
+    # I cleaned it up in v0.2, what with bit-manipulation and looping
+    # Thanks to Kinnay for suggestions to make this even faster
+    print("Decompressing Yaz0....")
 
-class Yaz0(object):
-    def decompress(self, data):
-        # Thanks to thakis for yaz0dec, which I modeled this on after
-        # I cleaned it up in v0.2, what with bit-manipulation and looping
-        # Thanks to Kinnay for suggestions to make this even faster
-        print("Decompressing Yaz0....")
+    pos = 16
+    size = uint32(data, 4)  # Uncompressed filesize
+    out = []
+    dstpos = 0
 
-        pos = 16
-        size = uint32(data, 4)  # Uncompressed filesize
-        out = []
-        dstpos = 0
+    percent = 0
+    bits = 0
 
-        percent = 0
-        bits = 0
+    if len(data) >= 5242880:
+        count = 5  # 5MB is gonna take a while
+    else:
+        count = 10
 
-        if len(data) >= 5242880:
-            count = 5  # 5MB is gonna take a while
+    while len(out) < size:  # Read Entire File
+        percent = check(len(out), size, percent, count)
+
+        if bits == 0:
+            code = uint8(data, pos)
+            pos += 1
+            bits = 8
+
+        if (code & 0x80) != 0:  # Copy 1 Byte
+            out.append(data[pos])
+            pos += 1
+
         else:
-            count = 10
+            rle = uint16(data, pos)
+            pos += 2
 
-        while len(out) < size:  # Read Entire File
-            percent = check(len(out), size, percent, count)
+            dist = rle & 0xFFF
+            dstpos = len(out) - (dist + 1)
+            read = (rle >> 12)
 
-            if bits == 0:
-                code = uint8(data, pos)
+            if (rle >> 12) == 0:
+                read = ord(data[pos]) + 0x12
                 pos += 1
-                bits = 8
-
-            if (code & 0x80) != 0:  # Copy 1 Byte
-                out.append(data[pos])
-                pos += 1
-
             else:
-                rle = uint16(data, pos)
-                pos += 2
+                read += 2
 
-                dist = rle & 0xFFF
-                dstpos = len(out) - (dist + 1)
-                read = (rle >> 12)
+            for x in xrange(read):
+                out.append(out[dstpos + x])
 
-                if (rle >> 12) == 0:
-                    read = ord(data[pos]) + 0x12;pos += 1
-                else:
-                    read += 2
+        code <<= 1
+        bits -= 1
 
-                for x in xrange(read):
-                    out.append(out[dstpos + x])
+    out = "".join(out)
 
-            code <<= 1
-            bits -= 1
-
-        out = "".join(out)
-
-        sarc_archive = SARC()
-        sarc_archive.extract(out, 1)
+    return out
 
 
-class SARC(object):
-    def extract(self, data, mode):
-        print("Reading SARC....")
-        pos = 6
+def sarc_extract(self, data, mode):
+    print("Reading SARC....")
+    pos = 6
 
-        name, ext = os.path.splitext(sys.argv[1])
+    name, ext = os.path.splitext(sys.argv[1])
 
-        if mode == 1:  # Don"t need to check again with normal SARC
-            magic1 = data[0:4]
+    if mode == 1:  # Don"t need to check again with normal SARC
+        magic1 = data[0:4]
 
-            if magic1 != "SARC":
-                print("Not a SARC Archive!")
-                print("Writing Decompressed File....")
+        if magic1 != "SARC":
+            print("Not a SARC Archive!")
+            print("Writing Decompressed File....")
 
-                f = open(name + ".bin", "wb")
-                f.write(data)
-                f.close()
+            f = open(name + ".bin", "wb")
+            f.write(data)
+            f.close()
 
-                print("Done!")
+            print("Done!")
 
-        # Byte Order Mark
-        order = uint16(data, pos)
-        pos += 6
+    # Byte Order Mark
+    order = uint16(data, pos)
+    pos += 6
 
-        if order != 65279:  # 0xFEFF - Big Endian
-            print("Little endian not supported!")
-            sys.exit(1)
+    if order != 65279:  # 0xFEFF - Big Endian
+        print("Little endian not supported!")
+        sys.exit(1)
 
-        # Start of data section
-        doff = uint32(data, pos)
+    # Start of data section
+    doff = uint32(data, pos)
+    pos += 8
+
+    #---------------------------------------------------------------
+
+    magic2 = data[pos:pos + 4]
+    pos += 6
+
+    assert magic2 == "SFAT"
+
+    # Node Count
+    nodec = uint16(data, pos)
+    pos += 6
+
+    nodes = []
+    percent = 0
+
+    print("Reading File Attribute Table...")
+
+    for x in xrange(nodec):
         pos += 8
 
-        #---------------------------------------------------------------
+        # File Offset Start
+        srt = uint32(data, pos)
+        pos += 4
 
-        magic2 = data[pos:pos + 4]
-        pos += 6
+        # File Offset End
+        end = uint32(data, pos)
+        pos += 4
 
-        assert magic2 == "SFAT"
+        nodes.append([srt, end])
 
-        # Node Count
-        nodec = uint16(data, pos)
-        pos += 6
+    #---------------------------------------------------------------
+    magic3 = data[pos:pos + 4]
+    pos += 8
 
-        nodes = []
-        percent = 0
+    assert magic3 == "SFNT"
+    strings = []
+    percent = 0
 
-        print("Reading File Attribute Table...")
+    print("Reading Filenames....")
+    nonames = 0
+
+    if getstr(data[pos:]) == "":
+        print("No filenames found....")
+        nonames = 1
 
         for x in xrange(nodec):
-            pos += 8
+            strings.append("bfbin" + str(x) + ".bfbin")
 
-            # File Offset Start
-            srt = uint32(data, pos)
-            pos += 4
+    else:
+        for x in xrange(nodec):
+            string = getstr(data[pos:]);pos += len(string)
 
-            # File Offset End
-            end = uint32(data, pos)
-            pos += 4
+            while ord(data[pos]) == 0:
+                pos += 1  # Move to the next string
 
-            nodes.append([srt, end])
+            strings.append(string)
 
-        #---------------------------------------------------------------
-        magic3 = data[pos:pos + 4]
-        pos += 8
+    #---------------------------------------------------------------
+    print("Writing Files....")
 
-        assert magic3 == "SFNT"
-        strings = []
-        percent = 0
+    try:
+        os.mkdir(name)
+    except:
+        print("Folder already exists, continuing....")
 
-        print("Reading Filenames....")
-        nonames = 0
+    print
 
-        if getstr(data[pos:]) == "":
-            print("No filenames found....")
-            nonames = 1
+    if nonames:
+        print("ayy lmao")
+        '''Let's do some guessing, shall we?'''
+        bflim = 0
+        bflan = 0
+        bflyt = 0
 
-            for x in xrange(nodec):
-                strings.append("bfbin" + str(x) + ".bfbin")
+    for x in xrange(nodec):
+        filename = name + "/" + strings[x]
+        if not os.path.exists(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))
 
-        else:
-            for x in xrange(nodec):
-                string = getstr(data[pos:]);pos += len(string)
+        start, end = (doff + nodes[x][0]), (doff + nodes[x][1])
+        filedata = data[start:end]
 
-                while ord(data[pos]) == 0:
-                    pos += 1  # Move to the next string
-
-                strings.append(string)
-
-        #---------------------------------------------------------------
-        print("Writing Files....")
-
-        try:
-            os.mkdir(name)
-        except:
-            print("Folder already exists, continuing....")
-
-        print
-        
         if nonames:
-            print("ayy lmao")
-            '''Let's do some guessing, shall we?'''
-            bflim = 0
-            bflan = 0
-            bflyt = 0
+            if filedata[-0x28:-0x24] == "FLIM":
+                filename = name + "/" + "bflim" + str(bflim) + ".bflim"
+                bflim += 1
 
-        for x in xrange(nodec):
-            filename = name + "/" + strings[x]
-            if not os.path.exists(os.path.dirname(filename)):
-                os.makedirs(os.path.dirname(filename))
+            if filedata[0:4] == "FLAN":
+                filename = name + "/" + "bflan" + str(bflim) + ".bflan"
+                bflan += 1
 
-            start, end = (doff + nodes[x][0]), (doff + nodes[x][1])
-            filedata = data[start:end]
+            if filedata[0:4] == "FLYT":
+                filename = name + "/" + "bflyt" + str(bflim) + ".bflyt"
+                bflyt += 1
 
-            if nonames:
-                if filedata[-0x28:-0x24] == "FLIM":
-                    filename = name + "/" + "bflim" + str(bflim) + ".bflim"
-                    bflim += 1
+        print(filename)
 
-                if filedata[0:4] == "FLAN":
-                    filename = name + "/" + "bflan" + str(bflim) + ".bflan"
-                    bflan += 1
+        with open(filename, "wb") as f:
+            f.write(filedata)
 
-                if filedata[0:4] == "FLYT":
-                    filename = name + "/" + "bflyt" + str(bflim) + ".bflyt"
-                    bflyt += 1
+    print("Done!")
 
-            print(filename)
-
-            with open(filename, "wb") as f:
-                f.write(filedata)
-
-        print("Done!")
 
 def main():
     print("SARCExtract v0.4 by NWPlayer123")
@@ -280,12 +278,11 @@ def main():
     magic = data[0:4]
 
     if magic == "Yaz0":
-        sarc_archive = Yaz0()
-        sarc_archive.decompress(data)
+        decompressed = yaz0_decompress(data)
+        sarc_extract(decompressed, 1)
 
     elif magic == "SARC":
-        sarc_archive = SARC()
-        sarc_archive.extract(data, 0)
+        sarc_extract(data, 0)
 
     else:
         print("Unknown File Format: First 4 bytes of file must be Yaz0 or SARC")
