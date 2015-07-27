@@ -75,6 +75,7 @@ def intify(out, data, length=0):
             out.append(int(data[x * 2:(x * 2) + 2], 16))
     return out
 
+
 def yaz0_decompress(data):
     # Thanks to thakis for yaz0dec, which I modeled this on after
     # I cleaned it up in v0.2, what with bit-manipulation and looping
@@ -84,8 +85,9 @@ def yaz0_decompress(data):
     pos = 16
     size = uint32(data, 4)  # Uncompressed filesize
     out = []
-    dstpos = 0
+    out_len = 0
 
+    dstpos = 0
     percent = 0
     bits = 0
 
@@ -95,7 +97,7 @@ def yaz0_decompress(data):
         count = 10
 
     while len(out) < size:  # Read Entire File
-        percent = check(len(out), size, percent, count)
+        percent = check(out_len, size, percent, count)
 
         if bits == 0:
             code = uint8(data, pos)
@@ -105,6 +107,7 @@ def yaz0_decompress(data):
         if (code & 0x80) != 0:  # Copy 1 Byte
             out.append(data[pos])
             pos += 1
+            out_len += 1
 
         else:
             rle = uint16(data, pos)
@@ -122,6 +125,7 @@ def yaz0_decompress(data):
 
             for x in xrange(read):
                 out.append(out[dstpos + x])
+                out_len += 1
 
         code <<= 1
         bits -= 1
