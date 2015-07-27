@@ -75,7 +75,7 @@ def intify(out, data, length=0):
             out.append(int(data[x * 2:(x * 2) + 2], 16))
     return out
 
-def yaz0_decompress(self, data):
+def yaz0_decompress(data):
     # Thanks to thakis for yaz0dec, which I modeled this on after
     # I cleaned it up in v0.2, what with bit-manipulation and looping
     # Thanks to Kinnay for suggestions to make this even faster
@@ -131,7 +131,7 @@ def yaz0_decompress(self, data):
     return out
 
 
-def sarc_extract(self, data, mode):
+def sarc_extract(data, mode):
     print("Reading SARC....")
     pos = 6
 
