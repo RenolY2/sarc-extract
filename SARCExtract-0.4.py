@@ -12,25 +12,15 @@ except NameError:
     def xrange(*args):
         return range(*args)
 
-
-def hexstr(data, length):  # Convert input into hex string
-    return hex(data).lstrip("0x").rstrip("L").zfill(length).upper()
-
-
-def binr(byte):
-    return bin(byte).lstrip("0b").zfill(8)
-
-
 def uint8(data, pos):
     return struct.unpack(">B", data[pos:pos + 1])[0]
-
 
 def uint16(data, pos):
     return struct.unpack(">H", data[pos:pos + 2])[0]
 
 
 def uint24(data, pos):
-    return struct.unpack(">I", "\00" + data[pos:pos + 3])[0]  # HAX
+    return struct.unpack(">I", "\x00" + data[pos:pos + 3])[0]  # HAX
 
 
 def uint32(data, pos):
@@ -38,9 +28,11 @@ def uint32(data, pos):
 
 
 def check(length, size, percent, count):
-    length = float(length);size = float(size)
+    length = float(length)
+    size = float(size)
+
     test = round(length / size, 2)  # Percent complete as decimal
-    test *= 100 #Percent
+    test *= 100  # Percent
 
     if test % count == 0:
         if percent != test:  # New Number
@@ -50,31 +42,12 @@ def check(length, size, percent, count):
     return percent
 
 
-def calchash(name, multiplier):
-    result = 0
-    for x in xrange(len(name)):
-        result = ord(name[x]) + result * multiplier
-    return result
-
-
-def getstr(data):
+def get_str(data):
     x = data.find("\x00")
     if x != -1:
         return data[:x]
     else:
         return data
-
-
-def intify(out, data, length=0):
-    if type(data) == str:
-        for x in xrange(len(data)):
-            out.append(ord(data[x]))
-    if type(data) == int:
-        data = hexstr(data, length * 2)
-        for x in xrange(length):
-            out.append(int(data[x * 2:(x * 2) + 2], 16))
-    return out
-
 
 def yaz0_decompress(data):
     # Thanks to thakis for yaz0dec, which I modeled this on after
@@ -148,9 +121,8 @@ def sarc_extract(data, mode):
             print("Not a SARC Archive!")
             print("Writing Decompressed File....")
 
-            f = open(name + ".bin", "wb")
-            f.write(data)
-            f.close()
+            with open(name + ".bin", "wb") as f:
+                f.write(data)
 
             print("Done!")
 
@@ -206,7 +178,7 @@ def sarc_extract(data, mode):
     print("Reading Filenames....")
     nonames = 0
 
-    if getstr(data[pos:]) == "":
+    if get_str(data[pos:]) == "":
         print("No filenames found....")
         nonames = 1
 
@@ -215,7 +187,7 @@ def sarc_extract(data, mode):
 
     else:
         for x in xrange(nodec):
-            string = getstr(data[pos:]);pos += len(string)
+            string = get_str(data[pos:]);pos += len(string)
 
             while ord(data[pos]) == 0:
                 pos += 1  # Move to the next string
@@ -234,13 +206,13 @@ def sarc_extract(data, mode):
 
     if nonames:
         print("ayy lmao")
-        '''Let's do some guessing, shall we?'''
         bflim = 0
         bflan = 0
         bflyt = 0
 
     for x in xrange(nodec):
-        filename = name + "/" + strings[x]
+        filename = os.path.join(name, strings[x])
+
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
 
@@ -253,11 +225,11 @@ def sarc_extract(data, mode):
                 bflim += 1
 
             if filedata[0:4] == "FLAN":
-                filename = name + "/" + "bflan" + str(bflim) + ".bflan"
+                filename = name + "/" + "bflan" + str(bflan) + ".bflan"
                 bflan += 1
 
             if filedata[0:4] == "FLYT":
-                filename = name + "/" + "bflyt" + str(bflim) + ".bflyt"
+                filename = name + "/" + "bflyt" + str(bflyt) + ".bflyt"
                 bflyt += 1
 
         print(filename)
