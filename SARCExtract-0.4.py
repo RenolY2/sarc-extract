@@ -1,4 +1,6 @@
-'''Made by NWPlayer123, no rights reserved, feel free to do whatever'''
+#
+# Made by NWPlayer123, no rights reserved, feel free to do whatever
+#
 
 import os
 import sys
@@ -12,15 +14,13 @@ except NameError:
     def xrange(*args):
         return range(*args)
 
+
 def uint8(data, pos):
     return struct.unpack(">B", data[pos:pos + 1])[0]
 
+
 def uint16(data, pos):
     return struct.unpack(">H", data[pos:pos + 2])[0]
-
-
-def uint24(data, pos):
-    return struct.unpack(">I", "\x00" + data[pos:pos + 3])[0]  # HAX
 
 
 def uint32(data, pos):
@@ -49,6 +49,7 @@ def get_str(data):
     else:
         return data
 
+
 def yaz0_decompress(data):
     # Thanks to thakis for yaz0dec, which I modeled this on after
     # I cleaned it up in v0.2, what with bit-manipulation and looping
@@ -63,6 +64,7 @@ def yaz0_decompress(data):
     dstpos = 0
     percent = 0
     bits = 0
+    code = 0
 
     if len(data) >= 5242880:
         count = 5  # 5MB is gonna take a while
@@ -138,7 +140,7 @@ def sarc_extract(data, mode):
     doff = uint32(data, pos)
     pos += 8
 
-    #---------------------------------------------------------------
+    # ---------------------------------------------------------------
 
     magic2 = data[pos:pos + 4]
     pos += 6
@@ -146,15 +148,14 @@ def sarc_extract(data, mode):
     assert magic2 == "SFAT"
 
     # Node Count
-    nodec = uint16(data, pos)
+    node_count = uint16(data, pos)
     pos += 6
 
     nodes = []
-    percent = 0
 
     print("Reading File Attribute Table...")
 
-    for x in xrange(nodec):
+    for x in xrange(node_count):
         pos += 8
 
         # File Offset Start
@@ -167,50 +168,49 @@ def sarc_extract(data, mode):
 
         nodes.append([srt, end])
 
-    #---------------------------------------------------------------
+    # ---------------------------------------------------------------
     magic3 = data[pos:pos + 4]
     pos += 8
 
     assert magic3 == "SFNT"
     strings = []
-    percent = 0
 
-    print("Reading Filenames....")
-    nonames = 0
+    print("Reading file names....")
+    no_names = 0
 
     if get_str(data[pos:]) == "":
-        print("No filenames found....")
-        nonames = 1
+        print("No file names found....")
+        no_names = 1
 
-        for x in xrange(nodec):
+        for x in xrange(node_count):
             strings.append("bfbin" + str(x) + ".bfbin")
 
     else:
-        for x in xrange(nodec):
-            string = get_str(data[pos:]);pos += len(string)
+        for x in xrange(node_count):
+            string = get_str(data[pos:])
+            pos += len(string)
 
             while ord(data[pos]) == 0:
                 pos += 1  # Move to the next string
 
             strings.append(string)
 
-    #---------------------------------------------------------------
+    # ---------------------------------------------------------------
     print("Writing Files....")
 
     try:
         os.mkdir(name)
-    except:
+    except OSError:
         print("Folder already exists, continuing....")
 
-    print
+    if no_names:
+        print("No names found. Trying to guess the file names...")
 
-    if nonames:
-        print("ayy lmao")
-        bflim = 0
-        bflan = 0
-        bflyt = 0
+    flim_count = 0
+    flan_count = 0
+    flyt_count = 0
 
-    for x in xrange(nodec):
+    for x in xrange(node_count):
         filename = os.path.join(name, strings[x])
 
         if not os.path.exists(os.path.dirname(filename)):
@@ -219,18 +219,18 @@ def sarc_extract(data, mode):
         start, end = (doff + nodes[x][0]), (doff + nodes[x][1])
         filedata = data[start:end]
 
-        if nonames:
+        if no_names:
             if filedata[-0x28:-0x24] == "FLIM":
-                filename = name + "/" + "bflim" + str(bflim) + ".bflim"
-                bflim += 1
+                filename = name + "/" + "bflim" + str(flim_count) + ".bflim"
+                flim_count += 1
 
             if filedata[0:4] == "FLAN":
-                filename = name + "/" + "bflan" + str(bflan) + ".bflan"
-                bflan += 1
+                filename = name + "/" + "bflan" + str(flan_count) + ".bflan"
+                flan_count += 1
 
-            if filedata[0:4] == "FLYT":
-                filename = name + "/" + "bflyt" + str(bflyt) + ".bflyt"
-                bflyt += 1
+            elif filedata[0:4] == "FLYT":
+                filename = name + "/" + "bflyt" + str(flyt_count) + ".bflyt"
+                flyt_count += 1
 
         print(filename)
 
